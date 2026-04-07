@@ -1,0 +1,426 @@
+You are helping me build a practical Excel based skills matrix and line qualification workbook for Packaging at a cosmetic manufacturing plant.
+
+I am a training leader, not a software engineer, so the output must be easy to maintain in Excel by normal business users after it is created.
+
+Before you write code, do these things first:
+1. Inspect the current folder for any example files, templates, employee lists, line names, or prior matrix documents.
+2. Summarize your assumptions briefly.
+3. Propose a short implementation plan.
+4. Then build the solution.
+
+Goal
+Create a maintainable Excel workbook that helps me:
+1. Track core skill proficiency for Packaging PLT and MT II employees. Treat PLT and MT II as the same role family for this first version.
+2. Show which packaging lines each person can run.
+3. Highlight critical skill gaps.
+4. Show line coverage so leaders can quickly see where staffing risk exists.
+5. Keep the workbook clean, printable, and easy for manufacturing leaders and trainers to use.
+
+Important design direction
+Do not build this like a simple sign off checklist.
+Use a system that separates:
+A. skill definitions
+B. employee skill assessments
+C. line qualification
+D. dashboard reporting
+
+Use Excel formulas, tables, data validation, and conditional formatting.
+Do not use macros or VBA.
+Build this with Python and openpyxl unless the repo already contains a better established workbook generation pattern.
+Leave behind both the generated workbook and the Python script that creates it.
+
+Files to create
+1. build_packaging_skills_matrix.py
+2. packaging_skills_matrix.xlsx
+3. README.md
+
+Definition of done
+The workbook must open cleanly in Excel with no repair warnings.
+The Python script must run without manual editing.
+The workbook must contain working tables, formulas, dropdowns, and conditional formatting.
+The workbook must be understandable by a non technical manufacturing user.
+The README must explain how to update line names, employee names, skill definitions, and dropdown values.
+
+Workbook structure
+Create these tabs in this order:
+
+1. Instructions
+2. Employee_List
+3. Skill_Definitions
+4. Core_Skill_Assessments
+5. Line_Qualifications
+6. Dashboard
+7. Lists
+
+Hide the Lists tab after creation, but keep it easy to unhide and edit.
+
+Tab requirements
+
+Tab 1: Instructions
+Purpose:
+A simple user guide for leaders, trainers, and admins.
+
+Include:
+- What each tab is for
+- What the scoring levels mean
+- How to update employees
+- How to update line names
+- How to update skill definitions
+- How the critical gap logic works
+- How the line qualification logic works
+- What dashboard colors or flags mean
+
+Keep this tab clean and readable with wrapped text and clear section headers.
+
+Tab 2: Employee_List
+Purpose:
+Master roster for employees.
+
+Create an Excel table with these columns:
+- Employee_ID
+- Employee_Name
+- Role_Family
+- Shift
+- Cell
+- Team_Lead
+- Primary_Trainer
+- Hire_Date
+- Active_Status
+
+Use dropdowns where appropriate from the Lists tab.
+Seed with 10 to 12 realistic example rows using placeholder names so formulas and dashboard views are visible.
+Role_Family should default to PLT_MT2 for this version.
+
+Tab 3: Skill_Definitions
+Purpose:
+One row per competency, not repeated per employee.
+
+Create an Excel table with these columns:
+- Category
+- Competency_ID
+- Competency
+- Level_3_Standard
+- Critical_Flag
+- Required_Level_For_Role
+- Notes
+
+Use this core proficiency scale for skill assessments:
+1 = Awareness
+2 = Assisted
+3 = Independent
+4 = Trainer
+
+Level 3 is the standard for independent performance.
+Required_Level_For_Role should be 3 for most skills in this first version unless there is a strong reason to set otherwise.
+
+Use these skill categories and competencies.
+
+Category: Safety and Compliance
+1. Applies LOTO correctly for the task being performed
+   Level 3 standard: Performs LOTO without missing steps and verifies zero energy before work begins
+   Critical: Yes
+
+2. Identifies emergency stops and safety devices on the assigned line
+   Level 3 standard: Can locate and explain the purpose of major safety devices without prompting
+   Critical: Yes
+
+3. Uses proper PPE and follows GMP and GDP during active work
+   Level 3 standard: Uses correct PPE and maintains compliant practices during normal work without reminders
+   Critical: Yes
+
+Category: Line and Equipment Understanding
+4. Explains line flow from start to finish
+   Level 3 standard: Can walk the line and explain the purpose of each major section in the process
+   Critical: No
+
+5. Identifies major components and their function
+   Level 3 standard: Correctly identifies major machine components and explains their basic function
+   Critical: No
+
+6. Navigates HMI screens needed for operation
+   Level 3 standard: Uses the HMI to monitor status and perform normal operating actions without help
+   Critical: No
+
+Category: Startup and Pre Run Checks
+7. Performs pre run checks completely
+   Level 3 standard: Completes all required pre run checks without skipping steps
+   Critical: Yes
+
+8. Verifies correct components against the work order
+   Level 3 standard: Confirms components match the work order and catches mismatches before startup
+   Critical: Yes
+
+9. Confirms line readiness before startup
+   Level 3 standard: Verifies line setup, materials, and readiness before startup without prompting
+   Critical: Yes
+
+Category: Running the Line
+10. Maintains steady line operation
+    Level 3 standard: Runs the line with normal stability and avoids unnecessary stops caused by operator error
+    Critical: No
+
+11. Makes basic adjustments to maintain flow
+    Level 3 standard: Performs normal operating adjustments to keep the line flowing without needing frequent help
+    Critical: No
+
+12. Communicates issues before they escalate
+    Level 3 standard: Recognizes developing issues and communicates early with the right level of detail
+    Critical: No
+
+Category: In Process Quality
+13. Verifies coding against the work order
+    Level 3 standard: Confirms coding matches the work order before release and recognizes obvious coding errors
+    Critical: Yes
+
+14. Performs FAI verification correctly
+    Level 3 standard: Completes required FAI verification steps accurately without missing key checks
+    Critical: Yes
+
+15. Identifies common defects and responds appropriately
+    Level 3 standard: Recognizes common product or package defects and takes the correct next step
+    Critical: Yes
+
+Category: Troubleshooting and Mechanical Skill
+16. Clears jams safely
+    Level 3 standard: Clears common jams safely without causing additional issues
+    Critical: No
+
+17. Performs minor mechanical adjustments
+    Level 3 standard: Completes routine minor adjustments correctly and knows when the issue is beyond their level
+    Critical: No
+
+18. Identifies likely root cause of common stops
+    Level 3 standard: Can explain the likely cause of a common stop and take the correct first response
+    Critical: No
+
+Category: Changeover and Setup
+19. Performs routine format change steps
+    Level 3 standard: Completes routine changeover tasks in the correct sequence with minimal correction
+    Critical: Yes
+
+20. Verifies correct parts and settings after changeover
+    Level 3 standard: Confirms parts and settings are correct before startup after a changeover
+    Critical: Yes
+
+Category: Documentation and Systems
+21. Completes work orders accurately
+    Level 3 standard: Enters required work order information accurately and completely
+    Critical: No
+
+22. Uses Informance correctly including downtime tracking
+    Level 3 standard: Uses correct downtime codes and enters data accurately without rework
+    Critical: No
+
+23. Updates whiteboards and batch information accurately
+    Level 3 standard: Keeps shift and production information accurate and current
+    Critical: No
+
+Category: Sanitation and Shutdown
+24. Performs proper shutdown
+    Level 3 standard: Shuts down the line in the correct sequence and leaves equipment in the proper state
+    Critical: No
+
+25. Leaves the line clean and ready for next shift or sanitation
+    Level 3 standard: Leaves the area and equipment in acceptable condition for the next step in the process
+    Critical: No
+
+Category: Escalation and Ownership
+26. Knows when and how to escalate
+    Level 3 standard: Escalates at the right time with clear, useful information
+    Critical: No
+
+27. Gives clear shift handoff and ownership communication
+    Level 3 standard: Provides a complete and accurate handoff without leaving important issues unclear
+    Critical: No
+
+Format this tab for readability:
+- freeze top row
+- wrap text
+- filters on
+- consistent header styling
+- no merged cells
+
+Tab 4: Core_Skill_Assessments
+Purpose:
+Track each employee’s current level on each competency.
+
+Create an Excel table with one row per employee per competency.
+Use formulas or generated rows so that all active employees from Employee_List are paired with all competencies from Skill_Definitions.
+
+Columns:
+- Employee_ID
+- Employee_Name
+- Role_Family
+- Shift
+- Cell
+- Competency_ID
+- Category
+- Competency
+- Level_3_Standard
+- Critical_Flag
+- Required_Level_For_Role
+- Current_Level
+- Meets_Required
+- Critical_Gap
+- Last_Assessed_By
+- Last_Assessed_Date
+- Comments
+
+Rules:
+- Current_Level must use a dropdown from 1 to 4
+- Meets_Required should evaluate Yes or No
+- Critical_Gap should evaluate Yes when Critical_Flag is Yes and Current_Level is below Required_Level_For_Role
+- Add conditional formatting so Current_Level values below required are highlighted
+- Add stronger highlighting for Critical_Gap = Yes
+- Make it easy to filter by employee, category, critical gap, and assessor
+
+Tab 5: Line_Qualifications
+Purpose:
+Show which packaging lines each person can run.
+
+Use this line qualification scale:
+1 = Not trained
+2 = Can run with help
+3 = Can run independently
+4 = Can train others
+
+Important business rule:
+An employee should only be considered truly ready for independent line qualification when all critical core skills are at level 3 or above.
+Implement this with a helper column called Core_Critical_Ready that evaluates Yes or No from Core_Skill_Assessments.
+
+If actual line names are found in the project files, use them.
+If not, create editable placeholder lines named:
+Line_01 through Line_21
+
+Create one row per employee with these columns:
+- Employee_ID
+- Employee_Name
+- Role_Family
+- Shift
+- Cell
+- Core_Critical_Ready
+- Line_01
+- Line_02
+- Line_03
+- Line_04
+- Line_05
+- Line_06
+- Line_07
+- Line_08
+- Line_09
+- Line_10
+- Line_11
+- Line_12
+- Line_13
+- Line_14
+- Line_15
+- Line_16
+- Line_17
+- Line_18
+- Line_19
+- Line_20
+- Line_21
+- Total_Lines_Level_3_Plus
+- Total_Lines_Level_4
+- Notes
+
+Requirements:
+- Use dropdowns for each line rating
+- Add conditional formatting so 1 and 2 are visually distinct from 3 and 4
+- Add a warning format when a line rating is 3 or 4 but Core_Critical_Ready is No
+- Freeze panes and make the header row easy to scan
+- Keep the sheet printable in landscape mode
+
+Tab 6: Dashboard
+Purpose:
+Give leaders a fast staffing and risk view.
+
+Build a practical dashboard with formulas, no VBA, and no external refresh requirements.
+
+Include these sections:
+
+Section A: Line Coverage Summary
+For each of the 21 lines show:
+- number of employees at Level 3 or above
+- number of employees at Level 4
+- a low coverage flag when Level 3 or above count is below a threshold
+
+Put the low coverage threshold in the Lists tab so it can be changed easily.
+Default threshold = 3
+
+Section B: Critical Skill Gaps by Employee
+Show each employee with:
+- total number of critical gaps
+- total number of all skills below required
+Sort highest risk to lowest risk
+
+Section C: Critical Skill Gaps by Competency
+Show which critical competencies have the most people below required level
+
+Section D: Cross Training Opportunity View
+Show employees who:
+- are Core_Critical_Ready = Yes
+- and have 2 or fewer lines at Level 3 or above
+
+Section E: Trainer Bench Strength
+Show employees with the highest number of Level 4 line qualifications
+
+Make the dashboard clean, readable, and leadership friendly.
+Use simple formatting, not flashy formatting.
+
+Tab 7: Lists
+Purpose:
+Store all dropdown values and editable admin values.
+
+Include:
+- skill level values and labels for core skills
+- line qualification values and labels
+- role family list
+- shift list
+- cell list
+- active status list
+- low coverage threshold value
+- line names list
+
+Use named ranges for validation where helpful.
+
+General workbook standards
+- Use Excel tables wherever practical
+- Freeze panes on data tabs
+- Wrap text where needed
+- Use filters on tables
+- Avoid merged cells
+- Set reasonable column widths
+- Make printed pages readable
+- Keep formulas maintainable
+- Protect nothing by default
+- Use neutral professional formatting
+- Make the workbook usable even after the script is no longer used
+
+README requirements
+Explain:
+- what the workbook does
+- how to run the script
+- where to update employees
+- where to update line names
+- where to update skill definitions
+- how the dashboard works
+- what assumptions you made
+- what I should customize next
+
+Validation requirements
+After building the workbook:
+1. Run the script
+2. Confirm the workbook file is created
+3. Load the workbook again with openpyxl to confirm it opens successfully
+4. Print a brief completion summary listing:
+   - files created
+   - tabs created
+   - any assumptions or fallback choices used
+   - whether real line names were found or placeholders were used
+
+Output style
+Do not over explain.
+Be practical.
+Bias toward maintainability and business usability.
+Where design choices are unclear, choose the option that will make the workbook easier for plant leaders and trainers to use and maintain.
