@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 import re
 from typing import List, Tuple
@@ -14,21 +14,8 @@ from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.utils import get_column_letter
 
 OUTPUT_FILE = "packaging_skills_matrix.xlsx"
-
-EMPLOYEES = [
-    ("E1001", "Avery Carter", "PLT_MT2", "A", "Cell 1", "Jordan Lee", "M. Patel", "2022-03-14", "Active"),
-    ("E1002", "Blake Nguyen", "PLT_MT2", "A", "Cell 2", "Jordan Lee", "S. Morris", "2021-10-03", "Active"),
-    ("E1003", "Casey Ramirez", "PLT_MT2", "B", "Cell 1", "Taylor Kim", "M. Patel", "2023-01-09", "Active"),
-    ("E1004", "Dakota Singh", "PLT_MT2", "B", "Cell 3", "Taylor Kim", "A. Brooks", "2020-06-21", "Active"),
-    ("E1005", "Emerson Wright", "PLT_MT2", "C", "Cell 2", "Robin Hall", "S. Morris", "2024-02-12", "Active"),
-    ("E1006", "Finley Torres", "PLT_MT2", "C", "Cell 3", "Robin Hall", "A. Brooks", "2022-11-18", "Active"),
-    ("E1007", "Gray Allen", "PLT_MT2", "D", "Cell 1", "Jordan Lee", "M. Patel", "2019-09-27", "Active"),
-    ("E1008", "Harper Diaz", "PLT_MT2", "D", "Cell 2", "Taylor Kim", "S. Morris", "2021-04-30", "Active"),
-    ("E1009", "Indigo Foster", "PLT_MT2", "A", "Cell 3", "Robin Hall", "A. Brooks", "2020-12-07", "Active"),
-    ("E1010", "Jules Bennett", "PLT_MT2", "B", "Cell 2", "Jordan Lee", "M. Patel", "2023-07-19", "Active"),
-    ("E1011", "Kai Morgan", "PLT_MT2", "C", "Cell 1", "Taylor Kim", "S. Morris", "2024-05-13", "Active"),
-    ("E1012", "Logan Price", "PLT_MT2", "D", "Cell 3", "Robin Hall", "A. Brooks", "2022-08-05", "Inactive"),
-]
+LINE_SOURCE_FILE = "PackagingLines.xlsx"
+EMPLOYEE_SOURCE_FILE = "EMPLOYEE ROSTER.xlsx"
 
 SKILLS = [
     ("Safety and Compliance", "C01", "Applies LOTO correctly for the task being performed", "Performs LOTO without missing steps and verifies zero energy before work begins", "Yes", 3, ""),
@@ -61,29 +48,88 @@ SKILLS = [
 ]
 
 
-def find_line_names(repo_root: Path, max_lines: int = 21) -> Tuple[List[str], str]:
-    candidates: set[str] = set()
-    line_pattern = re.compile(r"\b(Line[\s_-]?\d{1,2}|L\d{1,2})\b", re.IGNORECASE)
-    for path in repo_root.glob("**/*"):
-        if path.is_dir():
+def _format_roster_name(name: str) -> str:
+    if "," in name:
+        last, first = [p.strip() for p in name.split(",", 1)]
+        return f"{first} {last}".strip()
+    return str(name).strip()
+
+
+def _extract_cell_from_department(department: str) -> str:
+    if not department:
+        return "Unassigned"
+    match = re.search(r"Packaging[-\s]*Cell\s*([0-9]+)", str(department), re.IGNORECASE)
+    if match:
+        return f"Cell {match.group(1)}"
+    return "Unassigned"
+
+
+def load_line_names(repo_root: Path, max_lines: int = 21) -> Tuple[List[str], List[str], str]:
+    source_file = repo_root / LINE_SOURCE_FILE
+    wb = load_workbook(source_file, data_only=True)
+    ws = wb[wb.sheetnames[0]]
+
+    lines: List[str] = []
+    cells_by_line: List[str] = []
+    active_cell = ""
+    for row in ws.iter_rows(min_row=1, max_col=2, values_only=True):
+        if row[0]:
+            active_cell = str(row[0]).strip()
+        if row[1]:
+            line_name = str(row[1]).strip()
+            lines.append(line_name)
+            cells_by_line.append(active_cell or "Cell ?")
+
+    if len(lines) < max_lines:
+        lines += [f"Line_{i:02d}" for i in range(len(lines) + 1, max_lines + 1)]
+        cells_by_line += ["Cell ?"] * (max_lines - len(cells_by_line))
+
+    return lines[:max_lines], cells_by_line[:max_lines], f"Loaded line names from {LINE_SOURCE_FILE} (Sheet1)."
+
+
+def load_filtered_employees(repo_root: Path) -> Tuple[List[tuple], str]:
+    source_file = repo_root / EMPLOYEE_SOURCE_FILE
+    wb = load_workbook(source_file, data_only=True)
+    ws = wb[wb.sheetnames[0]]
+
+    filtered = []
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        name, title, department, hire_date, *_ = row
+        if not name or not title:
             continue
-        if path.suffix.lower() not in {".md", ".txt", ".csv", ".json", ".yml", ".yaml"}:
+        title_l = str(title).lower()
+        dept_l = str(department or "").lower()
+        is_packaging = "packaging" in dept_l
+        is_plt = "tech production line ii" in title_l
+        is_mt2 = "tech machine" in title_l or "operator machine ii" in title_l
+        if not is_packaging or not (is_plt or is_mt2):
             continue
-        try:
-            text = path.read_text(encoding="utf-8", errors="ignore")
-        except Exception:
-            continue
-        for match in line_pattern.findall(text):
-            normalized = match.replace(" ", "_").replace("-", "_")
-            if normalized.lower().startswith("l") and not normalized.lower().startswith("line"):
-                digits = re.sub(r"\D", "", normalized)
-                normalized = f"Line_{int(digits):02d}" if digits else ""
-            if normalized:
-                candidates.add(normalized.title())
-    cleaned = sorted([c for c in candidates if c.lower().startswith("line_")], key=lambda x: int(re.sub(r"\D", "", x) or 999))
-    if cleaned:
-        return cleaned[:max_lines] + [f"Line_{i:02d}" for i in range(len(cleaned) + 1, max_lines + 1)], "Detected line-like names from repository text files"
-    return [f"Line_{i:02d}" for i in range(1, max_lines + 1)], "No line names found; used placeholders Line_01 to Line_21"
+
+        role_family = "PLT_MT2"
+        employee_name = _format_roster_name(str(name))
+        shift = "TBD"
+        cell = _extract_cell_from_department(str(department or ""))
+        team_lead = "TBD"
+        trainer = "TBD"
+        if isinstance(hire_date, datetime):
+            hire_date = hire_date.date().isoformat()
+        elif hasattr(hire_date, "isoformat"):
+            hire_date = hire_date.isoformat()
+        else:
+            hire_date = ""
+        active_status = "Active"
+        filtered.append((employee_name, role_family, shift, cell, team_lead, trainer, hire_date, active_status))
+
+    filtered = sorted(filtered, key=lambda x: x[0])
+    with_ids = []
+    for idx, employee in enumerate(filtered, start=1):
+        with_ids.append((f"E{3000 + idx}",) + employee)
+
+    note = (
+        f"Loaded employees from {EMPLOYEE_SOURCE_FILE} and filtered to Packaging department with titles "
+        "matching PLT ('Tech Production Line II') and MT II proxies ('Tech Machine' + 'Operator Machine II')."
+    )
+    return with_ids, note
 
 
 def style_header(ws, row=1):
@@ -107,7 +153,8 @@ def add_table(ws, name: str, start_cell: str, end_cell: str):
 
 def build_workbook():
     repo_root = Path(__file__).resolve().parent
-    line_names, line_name_note = find_line_names(repo_root)
+    line_names, line_cells, line_name_note = load_line_names(repo_root)
+    employees, employee_note = load_filtered_employees(repo_root)
 
     wb = Workbook()
     ws_instructions = wb.active
@@ -124,15 +171,16 @@ def build_workbook():
     ws_instructions["A1"].font = Font(size=14, bold=True)
     instruction_text = [
         ("Workbook purpose", "Track packaging core skills, line qualifications, and staffing risk for PLT/MT II."),
-        ("Tab guide", "Employee_List = master roster; Skill_Definitions = one row per competency; Core_Skill_Assessments = ratings per person/skill; Line_Qualifications = ratings per person/line; Dashboard = risk and coverage; Lists = admin values for dropdowns/thresholds."),
+        ("Tab guide", "Employee_List = roster; Skill_Definitions = competency standards; Core_Skill_Assessments = person vs core skills; Line_Qualifications = line depth; Dashboard = leadership snapshot; Lists = dropdown/admin data."),
         ("Core skill levels", "1 Awareness, 2 Assisted, 3 Independent (target), 4 Trainer."),
         ("Line qualification levels", "1 Not trained, 2 Can run with help, 3 Can run independently, 4 Can train others."),
-        ("Update employees", "Add or edit rows in Employee_List table. Keep Employee_ID unique. Active_Status controls who appears in assessment and line views when rebuilt."),
-        ("Update line names", "Edit line names in Lists tab (line_names list). Re-run script to refresh formulas and dashboard labels."),
+        ("Update employees", "HR or area leadership updates Employee_List monthly using roster export. Keep Employee_ID unique. Active_Status controls who appears in assessments."),
+        ("Update line names", "Packaging leadership updates Lists > line_name whenever line naming changes. Re-run script to refresh dashboard labels."),
         ("Update skill definitions", "Edit rows in Skill_Definitions table. Required level defaults to 3; set different value only where needed."),
         ("Critical gap logic", "Critical_Gap = Yes when Critical_Flag = Yes and Current_Level is below Required_Level_For_Role."),
         ("Line readiness logic", "Core_Critical_Ready = Yes only when employee has zero critical gaps in Core_Skill_Assessments."),
         ("Dashboard flags", "Red/amber flags indicate low line coverage or critical risk. Low coverage threshold is editable in Lists tab."),
+        ("Update ownership note", "Supervisors update Current_Level and line qualifications weekly; team leads maintain comments; department leaders review Dashboard in staff meeting."),
     ]
     r = 3
     for title, body in instruction_text:
@@ -168,8 +216,8 @@ def build_workbook():
         ("active_status", "Inactive", "Inactive"),
         ("admin", "Low_Coverage_Threshold", "3"),
     ]
-    for line in line_names:
-        rows.append(("line_name", line, line))
+    for line, cell in zip(line_names, line_cells):
+        rows.append(("line_name", line, f"{line} ({cell})"))
     for row in rows:
         ws_lists.append(row)
     style_header(ws_lists)
@@ -191,7 +239,7 @@ def build_workbook():
     # Employee list
     employee_headers = ["Employee_ID", "Employee_Name", "Role_Family", "Shift", "Cell", "Team_Lead", "Primary_Trainer", "Hire_Date", "Active_Status"]
     ws_employee.append(employee_headers)
-    for e in EMPLOYEES:
+    for e in employees:
         ws_employee.append(list(e))
     style_header(ws_employee)
     add_table(ws_employee, "EmployeeTable", "A1", f"I{ws_employee.max_row}")
@@ -224,7 +272,7 @@ def build_workbook():
         "Last_Assessed_By", "Last_Assessed_Date", "Comments"
     ]
     ws_assess.append(assess_headers)
-    active_employees = [e for e in EMPLOYEES if e[8] == "Active"]
+    active_employees = [e for e in employees if e[8] == "Active"]
     for emp in active_employees:
         for skill in SKILLS:
             ws_assess.append([
@@ -257,7 +305,7 @@ def build_workbook():
     )
 
     # Line qualifications
-    line_headers = ["Employee_ID", "Employee_Name", "Role_Family", "Shift", "Cell", "Core_Critical_Ready"] + [f"Line_{i:02d}" for i in range(1, 22)] + ["Total_Lines_Level_3_Plus", "Total_Lines_Level_4", "Notes"]
+    line_headers = ["Employee_ID", "Employee_Name", "Role_Family", "Shift", "Cell", "Core_Critical_Ready"] + line_names + ["Total_Lines_Level_3_Plus", "Total_Lines_Level_4", "Notes"]
     ws_lines.append(line_headers)
     for emp in active_employees:
         ws_lines.append([emp[0], emp[1], emp[2], emp[3], emp[4], ""] + [1] * 21 + [0, 0, ""])
@@ -291,7 +339,6 @@ def build_workbook():
     ws_dash["A1"].font = Font(size=14, bold=True)
     ws_dash["A2"] = f"Generated: {date.today().isoformat()}"
 
-    # Section A
     ws_dash["A4"] = "Section A: Line Coverage Summary"
     ws_dash["A4"].font = Font(bold=True)
     ws_dash.append(["Line", "Employees Level 3+", "Employees Level 4", "Low Coverage Flag"])
@@ -303,6 +350,16 @@ def build_workbook():
         ws_dash[f"B{row}"] = f"=COUNTIF(Line_Qualifications!{line_col}:{line_col},\">=3\")"
         ws_dash[f"C{row}"] = f"=COUNTIF(Line_Qualifications!{line_col}:{line_col},4)"
         ws_dash[f"D{row}"] = f"=IF(B{row}<LowCoverageThreshold,\"LOW\",\"OK\")"
+
+    # Compact KPI strip
+    ws_dash["F4"] = "KPI"
+    ws_dash["G4"] = "Value"
+    ws_dash["F5"] = "Active PLT/MT II"
+    ws_dash["G5"] = "=COUNTA(Employee_List!A:A)-1"
+    ws_dash["F6"] = "Critical-ready"
+    ws_dash["G6"] = '=COUNTIF(Line_Qualifications!F:F,"Yes")'
+    ws_dash["F7"] = "Lines flagged LOW"
+    ws_dash["G7"] = f'=COUNTIF(D{header_row+1}:D{header_row+21},"LOW")'
 
     # Section B
     start_b = ws_dash.max_row + 2
@@ -359,11 +416,14 @@ def build_workbook():
     style_header(ws_dash, row=start_d + 1)
     style_header(ws_dash, row=start_e + 1)
     ws_dash.freeze_panes = "A6"
-    ws_dash.column_dimensions["A"].width = 36
-    ws_dash.column_dimensions["B"].width = 24
-    ws_dash.column_dimensions["C"].width = 24
-    ws_dash.column_dimensions["D"].width = 18
+    ws_dash.column_dimensions["A"].width = 30
+    ws_dash.column_dimensions["B"].width = 18
+    ws_dash.column_dimensions["C"].width = 18
+    ws_dash.column_dimensions["D"].width = 16
+    ws_dash.column_dimensions["F"].width = 18
+    ws_dash.column_dimensions["G"].width = 12
     ws_dash.conditional_formatting.add(f"D{header_row+1}:D{header_row+21}", FormulaRule(formula=[f'$D{header_row+1}="LOW"'], fill=PatternFill("solid", fgColor="FFC7CE")))
+    style_header(ws_dash, row=4)
 
     # common alignment
     for ws in [ws_employee, ws_skills, ws_assess, ws_lines, ws_dash]:
@@ -371,6 +431,16 @@ def build_workbook():
             for c in row:
                 if c.alignment is None:
                     c.alignment = Alignment(vertical="top")
+
+    # highlight critical fields
+    for r in range(2, ws_skills.max_row + 1):
+        if ws_skills[f"E{r}"].value == "Yes":
+            ws_skills[f"E{r}"].fill = PatternFill("solid", fgColor="FFC7CE")
+            ws_skills[f"E{r}"].font = Font(color="9C0006", bold=True)
+    ws_assess.conditional_formatting.add(
+        f"J2:J{ws_assess.max_row}",
+        FormulaRule(formula=['$J2="Yes"'], fill=PatternFill("solid", fgColor="FFF2CC"), font=Font(bold=True))
+    )
 
     ws_lists.sheet_state = "hidden"
 
@@ -383,8 +453,8 @@ def build_workbook():
     print("Completion summary")
     print(f"- Files created: build_workbook.py, {OUTPUT_FILE}")
     print(f"- Tabs created: {', '.join(tab_names)}")
-    print(f"- Assumptions/fallbacks: Role_Family unified as PLT_MT2; seeded with 12 placeholder employees; {line_name_note}.")
-    print(f"- Line names source: {'Detected from repository' if 'Detected' in line_name_note else 'Placeholder names used'}")
+    print(f"- Assumptions/fallbacks: Role_Family unified as PLT_MT2; shift/team lead/trainer defaulted to TBD; {employee_note}")
+    print(f"- Line names source: {line_name_note}")
 
 
 if __name__ == "__main__":
