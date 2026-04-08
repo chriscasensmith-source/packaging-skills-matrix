@@ -8,7 +8,7 @@ This project builds a practical Excel workbook for packaging training leaders to
 
 ## Files
 - `build_workbook.py` - Python generator script (openpyxl only, no macros/VBA)
-- `packaging_skills_matrix.xlsx` - Generated workbook
+- `packaging_skills_matrix.xlsx` - Generated workbook (build artifact; excluded from commits)
 - `README.md` - Usage and maintenance guide
 
 ## How to run
@@ -67,13 +67,13 @@ This project builds a practical Excel workbook for packaging training leaders to
 
 ## Assumptions used
 - PLT and MT II are combined into one role family value: `PLT_MT2`.
-- Example employee roster uses placeholders (12 rows) for visibility and testing.
-- No confirmed real line names were found in this repository; default placeholders `Line_01` to `Line_21` were used.
+- Employee roster is pulled from `EMPLOYEE ROSTER.xlsx` and filtered to Packaging records with titles that map to PLT (`Tech Production Line II`) and MT II proxies (`Tech Machine`, `Operator Machine II`).
+- Line names are pulled from `PackagingLines.xlsx` (`Sheet1`) and loaded in workbook order.
 - Low coverage threshold default is `3` (editable in `Lists`).
 
 ## Suggested next customizations
-1. Replace placeholder employee names with current roster.
-2. Replace line placeholders with actual line names used on site.
+1. Confirm final title mapping rules for PLT/MT II and adjust filter logic if needed.
+2. Populate shift, team lead, and primary trainer fields from site systems.
 3. Assign primary trainers and team leads based on your org.
 4. Preload current known qualification levels to get immediate dashboard value.
 5. Review `Critical_Flag` and required levels with operations and quality leadership.
